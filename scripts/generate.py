@@ -179,7 +179,7 @@ def format_periodical(repos, num):
             if len(cn_desc) > 100:
                 cn_desc = cn_desc[:97] + "..."
             
-            lines.append(f"{i}. **[@{name}]({url})** ⭐{format_stars(stars)}")
+            lines.append(f"{i}. **[{name}]({url})** ⭐{format_stars(stars)}")
             lines.append(f"   {cn_desc}")
             lines.append("")
             total += 1
