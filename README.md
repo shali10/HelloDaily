@@ -9,8 +9,12 @@
 
 ## 往期
 
-（暂无更多）
+| :card_index: | :jack_o_lantern: | :beer: | :fish_cake: | :octocat: |
+| ------- | ----- | ------------ | ------ | --------- |
+| [第 001 期](content/HelloDaily001.md) |  |  |  |  |
 
 ## 关于
 
 每天 9:00 自动搜索 GitHub Trending + 热门项目，按语言分类生成 markdown 文件。
+
+欢迎[推荐或自荐](https://github.com/shali10/HelloDaily/issues)项目成为 **HelloDaily** 的贡献者。
