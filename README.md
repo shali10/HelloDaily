@@ -14,5 +14,3 @@
 ## 关于
 
 每天 9:00 自动搜索 GitHub Trending + 热门项目，按语言分类生成 markdown 文件。
-
-由 [Hermes Agent](https://hermes-agent.nousresearch.com/) 自动生成。

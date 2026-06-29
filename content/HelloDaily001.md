@@ -53,4 +53,4 @@
    高性能代码智能 MCP 服务器，毫秒级索引代码库，支持 158 种语言。
 
 ---
-本期由 [HelloDaily](https://github.com/shali10/HelloDaily) 自动生成 · 2026-06-29
+本期由 HelloDaily 自动生成 · YYYY-MM-DD
