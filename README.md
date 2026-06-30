@@ -2,19 +2,20 @@
 
 ![GitHub stars](https://img.shields.io/github/stars/shali10/HelloDaily?style=flat-square)
 ![GitHub license](https://img.shields.io/github/license/shali10/HelloDaily?style=flat-square)
-![Periodicals](https://img.shields.io/badge/期数-005-blue?style=flat-square)
+![Periodicals](https://img.shields.io/badge/期数-006-blue?style=flat-square)
 
 > 每日开源精选，自动推送 GitHub 上有趣、入门级的项目。
 
 ## 最新一期
 
-📅 **[《HelloDaily》第 005 期](content/HelloDaily005.md)** · 2026-06-30
+📅 **[《HelloDaily》第 006 期](content/HelloDaily006.md)** · 2026-06-30
 
 ## 往期
 
 | :card_index: | :jack_o_lantern: | :beer: | :fish_cake: | :octocat: |
 | ------- | ----- | ------------ | ------ | --------- |
 | [第 001 期](content/HelloDaily001.md) | [第 002 期](content/HelloDaily002.md) | [第 003 期](content/HelloDaily003.md) | [第 004 期](content/HelloDaily004.md) | [第 005 期](content/HelloDaily005.md) |
+| [第 006 期](content/HelloDaily006.md) |  |  |  |  |
 
 ## 关于
 
