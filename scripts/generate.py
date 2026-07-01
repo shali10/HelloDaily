@@ -102,12 +102,23 @@ def get_next_number():
     return max(nums) + 1 if nums else 1
 
 
+def get_previous_projects(count=2):
+    """获取最近 N 期的项目列表，用于去重"""
+    files = sorted(CONTENT_DIR.glob("HelloDaily*.md"))
+    prev = set()
+    for f in files[-count:]:
+        content = f.read_text(encoding="utf-8")
+        for m in re.finditer(r'\*\*\[([^\]]+)\]\([^)]+\)', content):
+            prev.add(m.group(1))
+    return prev
+
+
 def fetch_repos():
     """获取 GitHub 热门项目"""
-    since = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    since = (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")
     url = (
         f"https://api.github.com/search/repositories"
-        f"?q=created:>{since}&sort=stars&order=desc&per_page=50"
+        f"?q=created:>{since}&sort=stars&order=desc&per_page=100"
     )
     stdout, code = run(["curl", "-s", url], timeout=20)
     if code != 0:
@@ -298,6 +309,14 @@ def main():
         sys.exit(1)
     
     print("翻译描述并生成内容...")
+    
+    # 去重：跳过最近 2 期出现过的项目
+    prev_projects = get_previous_projects(2)
+    deduped = [r for r in repos if r["full_name"] not in prev_projects]
+    skipped = len(repos) - len(deduped)
+    if skipped > 0:
+        print(f"去重过滤 {skipped} 个（最近 2 期出现过）")
+    repos = deduped[:30]  # 保留足够候选
     content = format_periodical(repos, num)
     filepath = CONTENT_DIR / f"HelloDaily{num:03d}.md"
     filepath.write_text(content, encoding="utf-8")
