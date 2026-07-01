@@ -1,4 +1,4 @@
-# 《HelloDaily》第 007 期
+# 《HelloDaily》第 004 期
 > 兴趣是最好的老师，HelloDaily 帮你找到开源的乐趣！
 
 <p align="center">
