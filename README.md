@@ -14,7 +14,7 @@
 
 | :card_index: | :jack_o_lantern: | :beer: | :fish_cake: | :octocat: |
 | ------- | ----- | ------------ | ------ | --------- |
-| [第 001 期](content/HelloDaily001.md) | [第 002 期](content/HelloDaily002.md) | [第 003 期](content/HelloDaily003.md) | [第 006 期](content/HelloDaily006.md) | [第 007 期](content/HelloDaily007.md) |
+| [第 001 期](content/HelloDaily001.md) | [第 002 期](content/HelloDaily002.md) | [第 003 期](content/HelloDaily003.md) | [第 007 期](content/HelloDaily007.md) |
 
 ## 关于
 
