@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-HelloDaily 自动生成脚本
-零 token 消耗，纯 API 调用
+HelloDaily 自动生成脚本 v2
+单次搜索 + 程序分类，保证多样性，min API 调用
 """
 import json
 import os
+import random
 import re
 import subprocess
 import sys
@@ -12,33 +13,87 @@ import urllib.parse
 from datetime import datetime, timedelta
 from pathlib import Path
 
+
 REPO = Path("/opt/HelloDaily")
 CONTENT_DIR = REPO / "content"
 README = REPO / "README.md"
 
-# 语言 emoji 映射
-LANG_EMOJI = {
-    "Python": "🐍", "JavaScript": "🟨", "TypeScript": "🔷",
-    "Go": "🐹", "Rust": "🦀", "Java": "☕", "Kotlin": "🐘",
-    "C": "🐅", "C++": "🐸", "C#": "🐉", "Ruby": "💎",
-    "Swift": "🦉", "PHP": "🐘", "Scala": "🔥", "Dart": "🎯",
-    "Shell": "🐚", "HTML": "🌐", "CSS": "🎨", "Lua": "🌙",
-    "Haskell": "λ", "Elixir": "💧", "Perl": "🐪",
-}
+# 从 git remote 提取 GitHub token
+_GIT_REMOTE = None
+_GITHUB_TOKEN = None
 
-# 中文关键词检测
+
+def get_token():
+    global _GITHUB_TOKEN
+    if _GITHUB_TOKEN:
+        return _GITHUB_TOKEN
+    try:
+        out, _ = run(["git", "-C", str(REPO), "remote", "-v"])
+        for line in out.split("\n"):
+            if "github.com" in line and "fetch" in line:
+                m = re.search(r"https://([^@]+)@github\.com", line)
+                if m:
+                    _GITHUB_TOKEN = m.group(1)
+                    return _GITHUB_TOKEN
+    except Exception:
+        pass
+    return None
+
+
 RE_CHINESE = re.compile(r"[\u4e00-\u9fff]")
 
-# 无意义描述关键词（跳过这些项目）
-MEANINGLESS_DESCS = [
+MEANINGLESS_DESCS = {
     "a", "an", "the", "none", "no description", "project", "test",
     "demo", "example", "just for fun", "learning", "tutorial",
     "my first", "practice", "nothing", "update", "fix",
+}
+
+# 关键词 → 分类映射（用于程序化分类）
+CATEGORY_KEYWORDS = [
+    ("🛠 开发工具", ["devtool", "debug", "ide", "compiler", "linter", "formatter", "plugin",
+                      "extension", "sdk", "framework", "scaffold", "boilerplate", "template",
+                      "monitoring", "logging", "testing", "ci/cd", "docker", "kubernetes",
+                      "config", "dotfile", "package", "dependency", "build", "deploy"]),
+    ("⚡ 效率提升", ["productivity", "automation", "workflow", "shortcut", "launcher",
+                      "clipboard", "note", "todo", "timer", "pomodoro", "habit",
+                      "manager", "organizer", "tracker", "alarm", "reminder",
+                      "hotkey", "macro", "snippet", "template"]),
+    ("🎨 视觉创意", ["visualization", "graphics", "animation", "glsl", "shader",
+                      "svg", "canvas", "webgl", "three", "d3", "chart", "plot",
+                      "diagram", "drawing", "pixel", "ascii", "font", "typography",
+                      "color", "theme", "icon", "emoji", "image"]),
+    ("🎮 游戏娱乐", ["game", "engine", "rpg", "fps", "puzzle", "retro", "emulator",
+                      "minecraft", "chess", "card", "board", "simulator",
+                      "gamedev", "godot", "unity", "unreal", "sprite"]),
+    ("📚 学习资源", ["tutorial", "awesome-list", "cheatsheet", "education", "course",
+                      "book", "ebook", "learn", "practice", "exercise",
+                      "interview", "algorithm", "data-structure", "problem",
+                      "roadmap", "guide", "handbook", "wiki"]),
+    ("💻 命令行神器", ["cli", "terminal", "shell", "bash", "zsh", "fish", "tui",
+                      "command", "alias", "pipe", "grep", "sed", "awk",
+                      "tmux", "screen", "ssh", "httpie", "curl"]),
+    ("📱 桌面/移动", ["desktop", "mobile", "app", "electron", "tauri", "flutter",
+                      "react-native", "swiftui", "compose", "widget",
+                      "cross-platform", "native", "ui", "spa"]),
+    ("🌐 Web 前端", ["react", "vue", "angular", "svelte", "solidjs", "nextjs",
+                      "nuxt", "astro", "css", "tailwind", "bootstrap",
+                      "component", "design-system", "landing", "portfolio"]),
+    ("🔧 数据处理", ["database", "sql", "nosql", "etl", "data-pipeline",
+                      "analytics", "big-data", "spark", "hadoop", "pandas",
+                      "dataframe", "csv", "excel", "spreadsheet", "json",
+                      "api", "graphql", "rest", "grpc"]),
+    ("🎯 有趣项目", ["fun", "art", "music", "creative", "generative", "procedural",
+                      "blender", "3d", "vr", "ar", "iot", "hardware",
+                      "raspberry", "arduino", "robot", "drone", "diy"]),
 ]
+
+# AI 相关关键词（避免过度推荐）
+AI_BLOCKLIST = {"llm", "gpt", "chatgpt", "openai", "langchain", "rag", "vector-db",
+                "fine-tune", "prompt", "diffusion", "stable-diffusion", "qwen", "llama",
+                "mistral", "gemini", "claude", "copilot", "codex"}
 
 
 def run(cmd, timeout=30):
-    """运行命令"""
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         return r.stdout.strip(), r.returncode
@@ -47,21 +102,17 @@ def run(cmd, timeout=30):
 
 
 def translate(text):
-    """Google 免费翻译：英文 → 中文"""
     if not text or len(text) < 5:
         return text
     if RE_CHINESE.search(text):
-        return text  # 已经是中文
+        return text
     try:
         q = urllib.parse.quote(text[:500])
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q={q}"
         out, code = run(["curl", "-s", url], timeout=10)
         if code == 0 and out:
             data = json.loads(out)
-            parts = []
-            for item in data[0]:
-                if item[0]:
-                    parts.append(item[0])
+            parts = [item[0] for item in data[0] if item[0]]
             result = "".join(parts)
             return result if result else text
     except Exception:
@@ -70,40 +121,67 @@ def translate(text):
 
 
 def is_valid_project(r):
-    """判断项目是否适合推荐"""
     desc = (r.get("description") or "").strip().lower()
     name = r.get("full_name", "")
     stars = r.get("stargazers_count", 0)
-    
-    # 排除过少 stars
-    if stars < 100:
+
+    if stars < 50 or stars > 50000:
         return False
-    
-    # 排除无意义描述
     if any(kw in desc for kw in MEANINGLESS_DESCS) and len(desc) < 20:
         return False
-    
-    # 排除企业级/过大的项目（太复杂不适合入门）
-    if stars > 100000:
-        # 太火的巨无霸项目，一般人用不上
-        pass  # 还是保留，量大管饱
-    
     return True
 
 
+def classify_project(r):
+    """根据描述和 topics 分类"""
+    desc = (r.get("description") or "").lower()
+    topics = [t.lower() for t in r.get("topics", [])]
+    lang = (r.get("language") or "").lower()
+    text = f"{desc} {' '.join(topics)} {lang}"
+
+    # AI 检测 - 如果太多 AI 特征，定为 AI 类但不完全排除
+    ai_hits = sum(1 for kw in AI_BLOCKLIST if kw in text)
+    if ai_hits >= 3:
+        return None  # 纯 AI 项目跳过
+
+    # 匹配分类关键词
+    scores = []
+    for cat_name, keywords in CATEGORY_KEYWORDS:
+        score = sum(1 for kw in keywords if kw in text)
+        if score > 0:
+            scores.append((score, cat_name))
+
+    if scores:
+        scores.sort(reverse=True)
+        return scores[0][1]
+
+    # 按语言兜底
+    lang_cat_map = {
+        "python": "🔧 数据处理",
+        "javascript": "🌐 Web 前端",
+        "typescript": "🌐 Web 前端",
+        "go": "💻 命令行神器",
+        "rust": "💻 命令行神器",
+        "c": "🛠 开发工具",
+        "c++": "🛠 开发工具",
+        "java": "📱 桌面/移动",
+        "kotlin": "📱 桌面/移动",
+        "swift": "📱 桌面/移动",
+        "dart": "📱 桌面/移动",
+        "ruby": "⚡ 效率提升",
+        "shell": "💻 命令行神器",
+        "lua": "🎮 游戏娱乐",
+    }
+    return lang_cat_map.get(lang, None)
+
+
 def get_next_number():
-    """获取下一期的期数"""
     files = list(CONTENT_DIR.glob("HelloDaily*.md"))
-    nums = []
-    for f in files:
-        m = re.search(r"HelloDaily(\d+)\.md", f.name)
-        if m:
-            nums.append(int(m.group(1)))
+    nums = [int(f.stem.replace("HelloDaily", "")) for f in files if re.match(r"HelloDaily\d+\.md", f.name)]
     return max(nums) + 1 if nums else 1
 
 
 def get_previous_projects(count=2):
-    """获取最近 N 期的项目列表，用于去重"""
     files = sorted(CONTENT_DIR.glob("HelloDaily*.md"))
     prev = set()
     for f in files[-count:]:
@@ -114,224 +192,218 @@ def get_previous_projects(count=2):
 
 
 def fetch_repos():
-    """获取 GitHub 热门项目"""
+    """单次大搜索 + 程序分类"""
+    token = get_token()
+    headers = ["-H", f"Authorization: token {token}"] if token else []
+
     since = (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")
-    url = (
-        f"https://api.github.com/search/repositories"
-        f"?q=created:>{since}&sort=stars&order=desc&per_page=100"
-    )
-    stdout, code = run(["curl", "-s", url], timeout=20)
-    if code != 0:
-        print(f"GitHub API 请求失败: {stdout}")
-        return []
-    try:
-        data = json.loads(stdout)
-        items = data.get("items", [])
-        # 过滤有效项目
-        valid = [r for r in items if is_valid_project(r)]
-        print(f"获取 {len(items)} 个，筛选后 {len(valid)} 个有效项目")
-        return valid
-    except json.JSONDecodeError:
-        return []
+    # 搜索：近期活跃、中等规模、非垄断的优质项目
+    queries = [
+        f"stars:100..5000 pushed:>{since}",
+        f"stars:50..1000 pushed:>{since}",
+    ]
+
+    all_items = []
+    seen = set()
+    for q in queries:
+        encoded_q = urllib.parse.quote(q)
+        url = f"https://api.github.com/search/repositories?q={encoded_q}&sort=stars&order=desc&per_page=60"
+        cmd = ["curl", "-s"] + headers + [url]
+        out, code = run(cmd, timeout=20)
+        if code != 0 or not out:
+            print(f"  API 请求失败: {out[:100]}")
+            continue
+        try:
+            data = json.loads(out)
+            for r in data.get("items", []):
+                name = r["full_name"]
+                if name not in seen and is_valid_project(r):
+                    seen.add(name)
+                    all_items.append(r)
+        except json.JSONDecodeError:
+            continue
+
+    print(f"  API 获取 {len(seen)} 个有效项目")
+
+    # 分类
+    classified = {}
+    uncategorized = []
+    for r in all_items:
+        cat = classify_project(r)
+        if cat:
+            if cat not in classified:
+                classified[cat] = []
+            if len(classified[cat]) < 5:
+                classified[cat].append(r)
+        else:
+            uncategorized.append(r)
+            if len(uncategorized) > 10:
+                break
+
+    # 确保每个分类至少有项目
+    result = []
+    for cat_name, _ in CATEGORY_KEYWORDS:
+        repos = classified.get(cat_name, [])
+        if repos:
+            random.shuffle(repos)
+            result.append((cat_name, repos[:3]))
+
+    # 补充未分类的到有缺失的分类
+    filled_cats = {n for n, _ in result}
+    for cat_name, _ in CATEGORY_KEYWORDS:
+        if cat_name not in filled_cats and uncategorized:
+            result.append((cat_name, uncategorized[:2]))
+            uncategorized = uncategorized[2:]
+
+    random.shuffle(result)
+    return result
 
 
-def format_periodical(repos, num):
-    """格式化 markdown"""
+def format_periodical(category_repos, num):
     today = datetime.now().strftime("%Y-%m-%d")
-    
-    # 按语言分组
-    by_lang = {}
-    for r in repos:
-        lang = r.get("language") or "其他"
-        if lang not in by_lang:
-            by_lang[lang] = []
-        by_lang[lang].append(r)
-    
-    # 按语言总 stars 排序
-    sorted_langs = sorted(
-        by_lang.items(),
-        key=lambda x: sum(r["stargazers_count"] for r in x[1]),
-        reverse=True
-    )
-    
     lines = []
     lines.append(f"# 《HelloDaily》第 {num:03d} 期")
-    lines.append("> 兴趣是最好的老师，HelloDaily 帮你找到开源的乐趣！")
+    lines.append("> 用心发现 GitHub 上有趣的项目，不止于热门分类。")
     lines.append("")
-    lines.append('<p align="center">')
-    lines.append('  <img src="https://raw.githubusercontent.com/521xueweihan/img_logo/master/logo/readme.gif"/>')
-    lines.append("</p>")
-    lines.append("")
-    lines.append("## 内容")
-    lines.append("> 以下为本期内容｜每天 9:00 更新")
-    lines.append("")
-    
-    total = 0
-    for lang, lang_repos in sorted_langs:
-        if total >= 15:
-            break
-        emoji = LANG_EMOJI.get(lang, "📦")
-        lines.append(f"### {emoji} {lang}")
+
+    for cat_name, repos in category_repos:
+        if not repos:
+            continue
+        lines.append(f"## {cat_name}")
         lines.append("")
-        
-        for i, r in enumerate(lang_repos[:3], 1):
-            if total >= 15:
-                break
-            
+
+        for i, r in enumerate(repos[:3], 1):
             name = r["full_name"]
             url = r["html_url"]
             stars = r["stargazers_count"]
             desc = (r.get("description") or "").strip()
-            
-            # 翻译描述
+            lang = r.get("language") or ""
+
             cn_desc = translate(desc) if desc else "暂无简介"
-            
-            # 限制描述长度
             if len(cn_desc) > 100:
                 cn_desc = cn_desc[:97] + "..."
-            
-            lines.append(f"{i}. **[{name}]({url})** ⭐{format_stars(stars)}")
+
+            lang_tag = f" `{lang}`" if lang else ""
+            lines.append(f"{i}. **[{name}]({url})** ⭐{format_stars(stars)}{lang_tag}")
             lines.append(f"   {cn_desc}")
             lines.append("")
-            total += 1
-    
+
     lines.append("---")
-    lines.append(f"本期由 HelloDaily 自动生成 · {today}")
     lines.append("")
-    
+    lines.append(f"本期由 HelloDaily 自动生成 · {today}")
     return "\n".join(lines)
 
 
 def format_stars(n):
-    """格式化 stars 数"""
     if n >= 1000:
         return f"{n/1000:.1f}k" if n % 1000 else f"{n//1000}k"
     return str(n)
 
 
-def update_readme(num):
-    """更新 README 往期表格"""
+def update_readme(num, cat_names=None):
     today = datetime.now().strftime("%Y-%m-%d")
-    
-    # 生成往期表格
+
     files = sorted(CONTENT_DIR.glob("HelloDaily*.md"))
-    rows = []
-    row = []
+    rows, row = [], []
     for f in files:
-        m = re.search(r"HelloDaily(\d+)\.md", f.name)
+        m = re.match(r"HelloDaily(\d+)\.md", f.name)
         if m:
             link = f"[第 {int(m.group(1)):03d} 期](content/{f.name})"
             row.append(link)
             if len(row) == 5:
-                rows.append(row)
-                row = []
+                rows.append(row); row = []
     if row:
-        while len(row) < 5:
-            row.append("")
+        while len(row) < 5: row.append("")
         rows.append(row)
-    
-    # 生成表格 markdown
-    table_lines = [
+
+    table = "\n".join([
         "| :card_index: | :jack_o_lantern: | :beer: | :fish_cake: | :octocat: |",
         "| ------- | ----- | ------------ | ------ | --------- |"
-    ]
-    for r in rows:
-        table_lines.append("| " + " | ".join(r) + " |")
-    table = "\n".join(table_lines)
-    
-    # 获取 stars
-    stars_badge = ""
-    try:
-        out, _ = run(["curl", "-s", "https://api.github.com/repos/shali10/HelloDaily"], timeout=10)
-        if out:
-            stars = json.loads(out).get("stargazers_count", 0)
-            stars_badge = "![GitHub stars](https://img.shields.io/github/stars/shali10/HelloDaily?style=flat-square)"
-    except:
-        pass
-    
+    ] + ["| " + " | ".join(r) + " |" for r in rows])
+
+    scope_line = ""
+    if cat_names:
+        short = " · ".join(cat_names[:6])
+        scope_line = f"本期涵盖：{short} 等\n"
+
     readme_content = f"""# HelloDaily
 
-{stars_badge}
+![GitHub stars](https://img.shields.io/github/stars/shali10/HelloDaily?style=flat-square)
 ![GitHub license](https://img.shields.io/github/license/shali10/HelloDaily?style=flat-square)
 ![Periodicals](https://img.shields.io/badge/期数-{num:03d}-blue?style=flat-square)
 
-> 每日开源精选，自动推送 GitHub 上有趣、入门级的项目。
+> 每周一三五自动更新，精选 GitHub 上不同领域的开源项目。
 
 ## 最新一期
 
 📅 **[《HelloDaily》第 {num:03d} 期](content/HelloDaily{num:03d}.md)** · {today}
 
-## 往期
+{scope_line}## 往期
 
 {table}
 
 ## 关于
 
-每天 9:00 自动搜索 GitHub Trending + 热门项目，按语言分类生成 markdown 文件。
-
-## 如何贡献
-
-- 推荐项目：提交 [Issue](https://github.com/shali10/HelloDaily/issues/new?template=recommend.md)
-- 提交 PR：参考 [CONTRIBUTING.md](CONTRIBUTING.md)
+每周一三五自动搜索 GitHub 开源项目，通过关键词匹配将项目归类到开发工具、效率提升、视觉创意、游戏、学习资源、命令行、桌面应用、Web 前端、数据处理、有趣项目等 10 个领域，避免单一刷 AI 或运维类项目。
 
 ## 项目结构
 
 ```
 HelloDaily/
 ├── content/              # 每期内容
-├── templates/            # 模板文件
 ├── scripts/              # 自动化脚本
-├── .github/              # GitHub 配置
 ├── README.md
-├── CONTRIBUTING.md
 └── LICENSE
 ---
 
-本期由 HelloDaily 自动生成 · 每天 9:00 更新
+本期由 HelloDaily 自动生成 · 每期覆盖不同领域
 """
     README.write_text(readme_content, encoding="utf-8")
 
 
 def main():
-    print("== HelloDaily 生成器 ==")
-    
+    print("== HelloDaily 生成器 v2 ==")
+
     num = get_next_number()
     print(f"准备生成第 {num:03d} 期")
-    
+
     print("拉取远程仓库...")
     os.chdir(REPO)
     run(["git", "pull", "--rebase"], timeout=20)
-    
-    print("获取 GitHub 热门项目...")
+
+    print("获取 GitHub 项目（认证搜索 + 程序分类）...")
     repos = fetch_repos()
-    if not repos:
+    valid = [(n, r) for n, r in repos if r]
+    if not valid:
         print("❌ 获取项目失败，退出")
         sys.exit(1)
-    
+
+    total = sum(len(r) for _, r in valid)
+    print(f"共 {total} 个项目，{len(valid)} 个分类")
+
+    # 去重
+    prev = get_previous_projects(2)
+    deduped = [(n, [r for r in rs if r["full_name"] not in prev]) for n, rs in valid]
+    deduped = [(n, rs) for n, rs in deduped if rs]
+
     print("翻译描述并生成内容...")
-    
-    # 去重：跳过最近 2 期出现过的项目
-    prev_projects = get_previous_projects(2)
-    deduped = [r for r in repos if r["full_name"] not in prev_projects]
-    skipped = len(repos) - len(deduped)
-    if skipped > 0:
-        print(f"去重过滤 {skipped} 个（最近 2 期出现过）")
-    repos = deduped[:30]  # 保留足够候选
-    content = format_periodical(repos, num)
-    filepath = CONTENT_DIR / f"HelloDaily{num:03d}.md"
-    filepath.write_text(content, encoding="utf-8")
-    print(f"已写入 {filepath.name}")
-    
+    content = format_periodical(deduped, num)
+    fp = CONTENT_DIR / f"HelloDaily{num:03d}.md"
+    fp.write_text(content, encoding="utf-8")
+    print(f"已写入 {fp.name}")
+
     print("更新 README...")
-    update_readme(num)
-    
+    update_readme(num, [n for n, _ in deduped])
+
     print("推送仓库...")
     run(["git", "add", "."], timeout=10)
     commit_out, code = run(["git", "commit", "-m", f"发布：《HelloDaily》第 {num:03d} 期"], timeout=10)
     print(commit_out)
+    if "nothing to commit" in commit_out.lower():
+        return
     push_out, code = run(["git", "push", "origin", "main"], timeout=30)
     print(push_out)
-    
+
     print(f"\n✅ 《HelloDaily》第 {num:03d} 期 已推送")
     print(f"https://github.com/shali10/HelloDaily/blob/main/content/HelloDaily{num:03d}.md")
 
