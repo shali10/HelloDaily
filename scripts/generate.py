@@ -18,8 +18,7 @@ REPO = Path("/opt/HelloDaily")
 CONTENT_DIR = REPO / "content"
 README = REPO / "README.md"
 
-# 从 git remote 提取 GitHub token
-_GIT_REMOTE = None
+# GitHub Token 获取缓存
 _GITHUB_TOKEN = None
 
 
@@ -27,6 +26,34 @@ def get_token():
     global _GITHUB_TOKEN
     if _GITHUB_TOKEN:
         return _GITHUB_TOKEN
+
+    # 1. 环境变量优先
+    env_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if env_token:
+        _GITHUB_TOKEN = env_token.strip()
+        return _GITHUB_TOKEN
+
+    # 2. 从 ~/.hermes/secrets/github_pat 读取
+    pat_file = Path.home() / ".hermes" / "secrets" / "github_pat"
+    if pat_file.is_file():
+        try:
+            token = pat_file.read_text(encoding="utf-8").strip()
+            if token:
+                _GITHUB_TOKEN = token
+                return _GITHUB_TOKEN
+        except Exception:
+            pass
+
+    # 3. 从 gh CLI 凭据读取
+    try:
+        out, code = run(["gh", "auth", "token"])
+        if code == 0 and out.startswith("gh"):
+            _GITHUB_TOKEN = out.strip()
+            return _GITHUB_TOKEN
+    except Exception:
+        pass
+
+    # 4. 历史兼容兜底：git remote 提取
     try:
         out, _ = run(["git", "-C", str(REPO), "remote", "-v"])
         for line in out.split("\n"):
