@@ -242,6 +242,14 @@ def fetch_repos():
             continue
         try:
             data = json.loads(out)
+            if "message" in data:
+                msg = data.get("message", "")
+                if "Bad credentials" in msg or "API rate limit" in msg:
+                    print(f"  ⚠️ GitHub API 鉴权/限流异常: {msg}，尝试未认证匿名重试...")
+                    cmd_anon = ["curl", "-s", url]
+                    out_anon, code_anon = run(cmd_anon, timeout=20)
+                    if code_anon == 0 and out_anon:
+                        data = json.loads(out_anon)
             for r in data.get("items", []):
                 name = r["full_name"]
                 if name not in seen and is_valid_project(r):
@@ -430,6 +438,9 @@ def main():
         return
     push_out, code = run(["git", "push", "origin", "main"], timeout=30)
     print(push_out)
+    if code != 0:
+        print("❌ Git 推送失败，请检查 GitHub 凭据或网络！")
+        sys.exit(1)
 
     print(f"\n✅ 《HelloDaily》第 {num:03d} 期 已推送")
     print(f"https://github.com/shali10/HelloDaily/blob/main/content/HelloDaily{num:03d}.md")
