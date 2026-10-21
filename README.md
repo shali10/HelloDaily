@@ -2,15 +2,15 @@
 
 ![GitHub stars](https://img.shields.io/github/stars/shali10/HelloDaily?style=flat-square)
 ![GitHub license](https://img.shields.io/github/license/shali10/HelloDaily?style=flat-square)
-![Periodicals](https://img.shields.io/badge/期数-054-blue?style=flat-square)
+![Periodicals](https://img.shields.io/badge/期数-055-blue?style=flat-square)
 
 > 每周一三五自动更新，精选 GitHub 上不同领域的开源项目。
 
 ## 最新一期
 
-📅 **[《HelloDaily》第 054 期](content/HelloDaily054.md)** · 2026-10-19
+📅 **[《HelloDaily》第 055 期](content/HelloDaily055.md)** · 2026-10-21
 
-本期涵盖：🎨 视觉创意 · 🎮 游戏娱乐 · 🛠 开发工具 · 🎯 有趣项目 · 💻 命令行神器 · 🌐 Web 前端 等
+本期涵盖：🔧 数据处理 · 📱 桌面/移动 · 🎯 有趣项目 · 📚 学习资源 · ⚡ 效率提升 · 🌐 Web 前端 等
 ## 往期
 
 | :card_index: | :jack_o_lantern: | :beer: | :fish_cake: | :octocat: |
@@ -25,7 +25,7 @@
 | [第 036 期](content/HelloDaily036.md) | [第 037 期](content/HelloDaily037.md) | [第 038 期](content/HelloDaily038.md) | [第 039 期](content/HelloDaily039.md) | [第 040 期](content/HelloDaily040.md) |
 | [第 041 期](content/HelloDaily041.md) | [第 042 期](content/HelloDaily042.md) | [第 043 期](content/HelloDaily043.md) | [第 044 期](content/HelloDaily044.md) | [第 045 期](content/HelloDaily045.md) |
 | [第 046 期](content/HelloDaily046.md) | [第 047 期](content/HelloDaily047.md) | [第 048 期](content/HelloDaily048.md) | [第 049 期](content/HelloDaily049.md) | [第 050 期](content/HelloDaily050.md) |
-| [第 051 期](content/HelloDaily051.md) | [第 052 期](content/HelloDaily052.md) | [第 053 期](content/HelloDaily053.md) | [第 054 期](content/HelloDaily054.md) |  |
+| [第 051 期](content/HelloDaily051.md) | [第 052 期](content/HelloDaily052.md) | [第 053 期](content/HelloDaily053.md) | [第 054 期](content/HelloDaily054.md) | [第 055 期](content/HelloDaily055.md) |
 
 ## 关于
 
